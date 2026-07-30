@@ -94,9 +94,9 @@ jobs:
               npm install
               npm run build
               
-              # Copy static HTML/CSS/JS export directly into GoDaddy public_html webroots
-              for target in "$HOME/public_html" "/home/$USER/public_html" "/var/www/html"; do
-                if [ -d "$target" ] || mkdir -p "$target" 2>/dev/null; then
+              # Discover and sync static web assets to ALL server webroots (public_html, mathisi.in, html, www)
+              for target in $(find $HOME /home /var/www -maxdepth 3 -type d \( -name "public_html" -o -name "mathisi.in" -o -name "html" -o -name "www" \) 2>/dev/null); do
+                if [ -d "$target" ]; then
                   echo "Syncing production web assets to: $target"
                   cp -r out/* "$target/" 2>/dev/null || true
                   cp -r public/* "$target/" 2>/dev/null || true
