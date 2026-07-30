@@ -84,6 +84,15 @@ jobs:
               cp -r public .next/standalone/ 2>/dev/null || true
               cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
 
+              # Copy distribution assets to Nginx / GoDaddy public webroots (fixes 404)
+              for target in "$HOME/public_html" "/var/www/html" "/home/$USER/public_html"; do
+                if [ -d "$target" ] || mkdir -p "$target" 2>/dev/null; then
+                  echo "Syncing assets to webroot: $target"
+                  cp -r public/* "$target/" 2>/dev/null || true
+                  cp -r .next/standalone/* "$target/" 2>/dev/null || true
+                fi
+              done
+
               # Reset old PM2 processes
               npx pm2 delete all 2>/dev/null || true
 
