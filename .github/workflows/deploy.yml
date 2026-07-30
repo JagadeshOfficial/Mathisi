@@ -104,15 +104,15 @@ jobs:
 
               # Write cPanel / PHP reverse proxy to ~/public_html to forward web traffic to port 9002
               mkdir -p "$HOME/public_html" 2>/dev/null || true
-              cat << 'EOF' > "$HOME/public_html/.htaccess" 2>/dev/null || true
+              cat << 'HTACCESS_EOF' > "$HOME/public_html/.htaccess" 2>/dev/null || true
 RewriteEngine On
 RewriteRule ^$ http://127.0.0.1:9002/ [P,L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ http://127.0.0.1:9002/$1 [P,L]
-EOF
+HTACCESS_EOF
 
-              cat << 'EOF' > "$HOME/public_html/index.php" 2>/dev/null || true
+              cat << 'PHP_EOF' > "$HOME/public_html/index.php" 2>/dev/null || true
 <?php
 $target = 'http://127.0.0.1:9002' . $_SERVER['REQUEST_URI'];
 $ch = curl_init($target);
@@ -131,8 +131,7 @@ foreach (explode("\r\n", $header) as $hdr) {
     }
 }
 echo $body;
-EOF
+PHP_EOF
 
               echo "Standalone Next.js server and PHP proxy deployed successfully!"
             fi
-
