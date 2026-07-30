@@ -16,12 +16,6 @@ const getImage = (id: string): ImagePlaceholder | undefined => {
     return PlaceHolderImages.find((img) => img.id === id);
 };
 
-export async function generateStaticParams() {
-    return blogPosts.map((post) => ({
-        slug: post.slug,
-    }));
-}
-
 export default function BlogPostDetail() {
     const { slug } = useParams();
     const router = useRouter();

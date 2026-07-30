@@ -7,12 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock, BarChart, GraduationCap, Phone, Mail, Globe } from "lucide-react";
 import { useEffect } from "react";
 
-export async function generateStaticParams() {
-    return courses.map((course) => ({
-        slug: course.slug,
-    }));
-}
-
 export default function CourseBrochurePage() {
     const params = useParams();
     const slug = params.slug as string;
