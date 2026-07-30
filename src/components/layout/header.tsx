@@ -25,42 +25,40 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
         <div className="flex items-center">
           <Link href="/" className="flex items-center">
-            <MathisiLogo className="h-14" />
+            <MathisiLogo className="h-11" />
           </Link>
         </div>
 
-        <div className="flex-1 justify-center hidden md:flex">
-          <nav className="flex items-center space-x-6 text-sm font-medium">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-1">
-                  Courses
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {courses.map((course) => (
-                  <DropdownMenuItem key={course.slug} asChild>
-                    <Link href={`/courses/${course.slug}`}>{course.name}</Link>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/courses">All Courses</Link>
+        <div className="hidden md:flex items-center space-x-6 text-sm font-medium">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="flex items-center gap-1">
+                Courses
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {courses.map((course) => (
+                <DropdownMenuItem key={course.slug} asChild>
+                  <Link href={`/courses/${course.slug}`}>{course.name}</Link>
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Link href="/about" className="transition-colors hover:text-foreground/80 text-foreground/60 focus:outline-none">About</Link>
-            <Link href="/blogs" className="transition-colors hover:text-foreground/80 text-foreground/60 focus:outline-none">Blogs</Link>
-            <Link href="/pap" className="transition-colors hover:text-foreground/80 font-bold text-primary whitespace-nowrap focus:outline-none">Pay After Placement</Link>
-            <Link href="/contact" className="transition-colors hover:text-foreground/80 text-foreground/60 focus:outline-none">Contact</Link>
-          </nav>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/courses">All Courses</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Link href="/about" className="transition-colors hover:text-foreground/80 text-foreground/60 focus:outline-none">About</Link>
+          <Link href="/blogs" className="transition-colors hover:text-foreground/80 text-foreground/60 focus:outline-none">Blogs</Link>
+          <Link href="/pap" className="transition-colors hover:text-foreground/80 font-bold text-primary whitespace-nowrap focus:outline-none">Pay After Placement</Link>
+          <Link href="/contact" className="transition-colors hover:text-foreground/80 text-foreground/60 focus:outline-none">Contact</Link>
         </div>
 
-        <div className="flex items-center justify-end space-x-2 md:flex-1">
+        <div className="flex items-center justify-end space-x-2">
           <div className="hidden md:flex items-center space-x-2">
             <Button variant="ghost" asChild>
               <Link href="/login">Login</Link>
