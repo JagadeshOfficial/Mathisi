@@ -32,13 +32,19 @@ jobs:
             [ -s "$HOME/.profile" ] && \. "$HOME/.profile"
             [ -s "$HOME/.bashrc" ] && \. "$HOME/.bashrc"
             
-            for p in $HOME/.nvm/versions/node/v*/bin /opt/alt/node*/bin /usr/local/bin /usr/bin /opt/cpanel/ea-nodejs*/bin; do
-              [ -d "$p" ] && export PATH="$p:$PATH"
-            done
+            NPM_BIN=$(find /home /usr /opt /var -name npm 2>/dev/null | head -n 1)
+            if [ -n "$NPM_BIN" ]; then
+              export PATH="$(dirname "$NPM_BIN"):$PATH"
+            fi
             
-            NODE_PATH=$(dirname $(find /home /usr /opt -name npm 2>/dev/null | head -n 1))
-            if [ -n "$NODE_PATH" ]; then
-              export PATH="$NODE_PATH:$PATH"
+            # --- Auto-install Node.js & NVM if missing ---
+            if ! command -v npm >/dev/null 2>&1; then
+              echo "NPM not found. Installing Node.js & NVM automatically..."
+              curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+              export NVM_DIR="$HOME/.nvm"
+              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+              nvm install 20
+              nvm use 20
             fi
             
             # Set target directory
@@ -69,7 +75,7 @@ jobs:
               echo "Pruning unused images..."
               docker image prune -f
             else
-              echo "Docker not found in PATH on server. Deploying with Node & PM2..."
+              echo "Deploying with Node & PM2..."
               npm install
               npm run build
               npx pm2 restart mathisi || npx pm2 start npm --name "mathisi" -- run start -- -p 9002
