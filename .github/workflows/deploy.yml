@@ -83,7 +83,7 @@ jobs:
 
             # Write cPanel / PHP reverse proxy to ~/public_html
             mkdir -p "$HOME/public_html" 2>/dev/null || true
-            printf 'RewriteEngine On\nRewriteRule ^$ http://127.0.0.1:9002/ [P,L]\nRewriteCond %%{REQUEST_FILENAME} !-f\nRewriteCond %%{REQUEST_FILENAME} !-d\nRewriteRule ^(.*)$ http://127.0.0.1:9002/$1 [P,L]\n' > "$HOME/public_html/.htaccess"
+            printf 'DirectoryIndex index.php\nRewriteEngine On\nRewriteCond %%{REQUEST_FILENAME} !-f\nRewriteCond %%{REQUEST_FILENAME} !-d\nRewriteRule ^(.*)$ index.php [QSA,L]\n' > "$HOME/public_html/.htaccess"
             printf '<?php\n$target = "http://127.0.0.1:9002" . $_SERVER["REQUEST_URI"];\n$ch = curl_init($target);\ncurl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\ncurl_setopt($ch, CURLOPT_HEADER, true);\ncurl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);\n$response = curl_exec($ch);\n$header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);\n$header = substr($response, 0, $header_size);\n$body = substr($response, $header_size);\ncurl_close($ch);\nforeach (explode("\\r\\n", $header) as $hdr) {\n    if (!empty($hdr) && !str_contains(strtolower($hdr), "transfer-encoding")) {\n        header($hdr);\n    }\n}\necho $body;\n' > "$HOME/public_html/index.php"
 
             echo "Standalone Next.js server and PHP proxy deployed successfully!"
