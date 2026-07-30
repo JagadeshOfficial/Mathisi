@@ -90,19 +90,49 @@ jobs:
               echo "Running Docker containers:"
               docker ps
             else
-              echo "Deploying Next.js build assets to GoDaddy public_html..."
+              echo "Deploying Next.js standalone server with PM2 & public_html proxy..."
               npm install
               npm run build
               
-              # Discover and sync static web assets to ALL server webroots (public_html, mathisi.in, html, www)
-              for target in $(find $HOME /home /var/www -maxdepth 3 -type d \( -name "public_html" -o -name "mathisi.in" -o -name "html" -o -name "www" \) 2>/dev/null); do
-                if [ -d "$target" ]; then
-                  echo "Syncing production web assets to: $target"
-                  cp -r out/* "$target/" 2>/dev/null || true
-                  cp -r public/* "$target/" 2>/dev/null || true
-                fi
-              done
+              # Prepare standalone distribution assets
+              cp -r public .next/standalone/ 2>/dev/null || true
+              cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
 
-              echo "Web assets deployed to public_html successfully!"
+              # Launch standalone Next.js server via PM2 on port 9002
+              PORT=9002 HOSTNAME=0.0.0.0 npx pm2 restart mathisi || PORT=9002 HOSTNAME=0.0.0.0 npx pm2 start .next/standalone/server.js --name "mathisi"
+              npx pm2 save
+
+              # Write cPanel / PHP reverse proxy to ~/public_html to forward web traffic to port 9002
+              mkdir -p "$HOME/public_html" 2>/dev/null || true
+              cat << 'EOF' > "$HOME/public_html/.htaccess" 2>/dev/null || true
+RewriteEngine On
+RewriteRule ^$ http://127.0.0.1:9002/ [P,L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ http://127.0.0.1:9002/$1 [P,L]
+EOF
+
+              cat << 'EOF' > "$HOME/public_html/index.php" 2>/dev/null || true
+<?php
+$target = 'http://127.0.0.1:9002' . $_SERVER['REQUEST_URI'];
+$ch = curl_init($target);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HEADER, true);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+$response = curl_exec($ch);
+$header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+$header = substr($response, 0, $header_size);
+$body = substr($response, $header_size);
+curl_close($ch);
+
+foreach (explode("\r\n", $header) as $hdr) {
+    if (!empty($hdr) && !str_contains(strtolower($hdr), 'transfer-encoding')) {
+        header($hdr);
+    }
+}
+echo $body;
+EOF
+
+              echo "Standalone Next.js server and PHP proxy deployed successfully!"
             fi
 
