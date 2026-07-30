@@ -83,6 +83,6 @@ jobs:
               npx pm2 save
 
               # Nginx Reverse Proxy Configuration
-              bash scripts/setup-nginx.sh || true
+              SUDO_PASSWORD="${{ secrets.PASSWORD }}" bash scripts/setup-nginx.sh || true
             fi
 

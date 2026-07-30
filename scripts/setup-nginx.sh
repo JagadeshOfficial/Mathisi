@@ -1,16 +1,20 @@
 #!/bin/bash
 set -e
 
-echo "Configuring web server reverse proxy..."
+echo "Configuring Nginx Reverse Proxy for mathisi.in..."
 
-# 1. Update Nginx configuration across all standard configuration locations
+# Password provided by user for sudo commands on GoDaddy server
+SUDO_PASS="${SUDO_PASSWORD:-White@2026@@}"
+
 if command -v nginx >/dev/null 2>&1; then
-  echo "Updating Nginx reverse proxy configuration for mathisi.in..."
-  
-  # Write config to conf.d (CentOS / RHEL / standard Nginx) and sites-available (Ubuntu / Debian)
-  cat << 'EOF' | sudo tee /etc/nginx/conf.d/mathisi.conf /etc/nginx/sites-available/mathisi.in > /dev/null || true
+  echo "Disabling Ubuntu default Nginx 404 site..."
+  echo "$SUDO_PASS" | sudo -S rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+
+  echo "Writing Nginx reverse proxy configuration for mathisi.in..."
+  echo "$SUDO_PASS" | sudo -S tee /etc/nginx/sites-available/mathisi.in /etc/nginx/conf.d/mathisi.conf > /dev/null << 'EOF'
 server {
-    listen 80;
+    listen 80 default_server;
+    listen [::]:80 default_server;
     server_name mathisi.in www.mathisi.in 68.178.173.224 _;
 
     location / {
@@ -24,11 +28,13 @@ server {
 }
 EOF
 
-  sudo ln -sf /etc/nginx/sites-available/mathisi.in /etc/nginx/sites-enabled/mathisi.in 2>/dev/null || true
-  sudo nginx -t && (sudo systemctl reload nginx || sudo service nginx reload || sudo nginx -s reload) 2>/dev/null || true
+  echo "Enabling site and reloading Nginx..."
+  echo "$SUDO_PASS" | sudo -S ln -sf /etc/nginx/sites-available/mathisi.in /etc/nginx/sites-enabled/mathisi.in 2>/dev/null || true
+  echo "$SUDO_PASS" | sudo -S nginx -t && (echo "$SUDO_PASS" | sudo -S systemctl reload nginx || echo "$SUDO_PASS" | sudo -S service nginx reload || echo "$SUDO_PASS" | sudo -S nginx -s reload) || true
+  echo "Nginx reverse proxy updated successfully!"
 fi
 
-# 2. Update .htaccess in web roots for Apache / cPanel proxy fallbacks
+# Fallback for Apache / cPanel webroots
 for webroot in /home/*/public_html /var/www/html /var/www/mathisi.in; do
   if [ -d "$webroot" ]; then
     echo "Writing reverse proxy .htaccess to $webroot..."
