@@ -26,7 +26,7 @@ jobs:
           request_pty: true
           command_timeout: 60m
           script: |
-            # --- Auto-discover Node, NPM, and Docker paths ---
+            # --- Auto-discover Node and NPM paths ---
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             [ -s "$HOME/.bash_profile" ] && \. "$HOME/.bash_profile"
@@ -67,71 +67,23 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             git clean -fd
+
+            # --- Next.js Build & PM2 Deploy ---
+            echo "Deploying Next.js standalone server with PM2..."
+            npm install
+            npm run build
             
-            # --- Auto-install Docker & Docker Compose if missing ---
-            if ! command -v docker >/dev/null 2>&1; then
-              echo "Docker not found on server. Installing Docker automatically..."
-              SUDO_PASS="${{ secrets.PASSWORD }}"
-              echo "$SUDO_PASS" | sudo -S yum install -y docker docker-compose 2>/dev/null || \
-              (echo "$SUDO_PASS" | sudo -S apt-get update && echo "$SUDO_PASS" | sudo -S apt-get install -y docker.io docker-compose 2>/dev/null) || \
-              (curl -fsSL https://get.docker.com | echo "$SUDO_PASS" | sudo -S sh) || true
-              
-              echo "$SUDO_PASS" | sudo -S systemctl enable --now docker || true
-              echo "$SUDO_PASS" | sudo -S usermod -aG docker $USER || true
-            fi
+            # Prepare standalone distribution assets
+            cp -r public .next/standalone/ 2>/dev/null || true
+            cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
 
-            # --- Docker Build & Deploy ---
-            if command -v docker >/dev/null 2>&1; then
-              echo "Deploying container with Docker Compose..."
-              docker compose down --remove-orphans || true
-              docker compose up -d --build
-              echo "Pruning unused images..."
-              docker image prune -f
-              echo "Running Docker containers:"
-              docker ps
-            else
-              echo "Deploying Next.js standalone server with PM2 & public_html proxy..."
-              npm install
-              npm run build
-              
-              # Prepare standalone distribution assets
-              cp -r public .next/standalone/ 2>/dev/null || true
-              cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
+            # Launch standalone Next.js server via PM2 on port 9002
+            PORT=9002 HOSTNAME=0.0.0.0 npx pm2 restart mathisi || PORT=9002 HOSTNAME=0.0.0.0 npx pm2 start .next/standalone/server.js --name "mathisi"
+            npx pm2 save
 
-              # Launch standalone Next.js server via PM2 on port 9002
-              PORT=9002 HOSTNAME=0.0.0.0 npx pm2 restart mathisi || PORT=9002 HOSTNAME=0.0.0.0 npx pm2 start .next/standalone/server.js --name "mathisi"
-              npx pm2 save
+            # Write cPanel / PHP reverse proxy to ~/public_html
+            mkdir -p "$HOME/public_html" 2>/dev/null || true
+            printf 'RewriteEngine On\nRewriteRule ^$ http://127.0.0.1:9002/ [P,L]\nRewriteCond %%{REQUEST_FILENAME} !-f\nRewriteCond %%{REQUEST_FILENAME} !-d\nRewriteRule ^(.*)$ http://127.0.0.1:9002/$1 [P,L]\n' > "$HOME/public_html/.htaccess"
+            printf '<?php\n$target = "http://127.0.0.1:9002" . $_SERVER["REQUEST_URI"];\n$ch = curl_init($target);\ncurl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\ncurl_setopt($ch, CURLOPT_HEADER, true);\ncurl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);\n$response = curl_exec($ch);\n$header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);\n$header = substr($response, 0, $header_size);\n$body = substr($response, $header_size);\ncurl_close($ch);\nforeach (explode("\\r\\n", $header) as $hdr) {\n    if (!empty($hdr) && !str_contains(strtolower($hdr), "transfer-encoding")) {\n        header($hdr);\n    }\n}\necho $body;\n' > "$HOME/public_html/index.php"
 
-              # Write cPanel / PHP reverse proxy to ~/public_html to forward web traffic to port 9002
-              mkdir -p "$HOME/public_html" 2>/dev/null || true
-              cat << 'HTACCESS_EOF' > "$HOME/public_html/.htaccess" 2>/dev/null || true
-              RewriteEngine On
-              RewriteRule ^$ http://127.0.0.1:9002/ [P,L]
-              RewriteCond %{REQUEST_FILENAME} !-f
-              RewriteCond %{REQUEST_FILENAME} !-d
-              RewriteRule ^(.*)$ http://127.0.0.1:9002/$1 [P,L]
-              HTACCESS_EOF
-
-              cat << 'PHP_EOF' > "$HOME/public_html/index.php" 2>/dev/null || true
-              <?php
-              $target = 'http://127.0.0.1:9002' . $_SERVER['REQUEST_URI'];
-              $ch = curl_init($target);
-              curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-              curl_setopt($ch, CURLOPT_HEADER, true);
-              curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-              $response = curl_exec($ch);
-              $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-              $header = substr($response, 0, $header_size);
-              $body = substr($response, $header_size);
-              curl_close($ch);
-
-              foreach (explode("\r\n", $header) as $hdr) {
-                  if (!empty($hdr) && !str_contains(strtolower($hdr), 'transfer-encoding')) {
-                      header($hdr);
-                  }
-              }
-              echo $body;
-              PHP_EOF
-
-              echo "Standalone Next.js server and PHP proxy deployed successfully!"
-            fi
+            echo "Standalone Next.js server and PHP proxy deployed successfully!"
