@@ -24,6 +24,7 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: ${{ secrets.PORT || 22 }}
           command_timeout: 60m
+          script: |
             # --- Load NVM & Shell Profile ---
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
