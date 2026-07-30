@@ -105,33 +105,33 @@ jobs:
               # Write cPanel / PHP reverse proxy to ~/public_html to forward web traffic to port 9002
               mkdir -p "$HOME/public_html" 2>/dev/null || true
               cat << 'HTACCESS_EOF' > "$HOME/public_html/.htaccess" 2>/dev/null || true
-RewriteEngine On
-RewriteRule ^$ http://127.0.0.1:9002/ [P,L]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ http://127.0.0.1:9002/$1 [P,L]
-HTACCESS_EOF
+              RewriteEngine On
+              RewriteRule ^$ http://127.0.0.1:9002/ [P,L]
+              RewriteCond %{REQUEST_FILENAME} !-f
+              RewriteCond %{REQUEST_FILENAME} !-d
+              RewriteRule ^(.*)$ http://127.0.0.1:9002/$1 [P,L]
+              HTACCESS_EOF
 
               cat << 'PHP_EOF' > "$HOME/public_html/index.php" 2>/dev/null || true
-<?php
-$target = 'http://127.0.0.1:9002' . $_SERVER['REQUEST_URI'];
-$ch = curl_init($target);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HEADER, true);
-curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-$response = curl_exec($ch);
-$header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-$header = substr($response, 0, $header_size);
-$body = substr($response, $header_size);
-curl_close($ch);
+              <?php
+              $target = 'http://127.0.0.1:9002' . $_SERVER['REQUEST_URI'];
+              $ch = curl_init($target);
+              curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+              curl_setopt($ch, CURLOPT_HEADER, true);
+              curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+              $response = curl_exec($ch);
+              $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+              $header = substr($response, 0, $header_size);
+              $body = substr($response, $header_size);
+              curl_close($ch);
 
-foreach (explode("\r\n", $header) as $hdr) {
-    if (!empty($hdr) && !str_contains(strtolower($hdr), 'transfer-encoding')) {
-        header($hdr);
-    }
-}
-echo $body;
-PHP_EOF
+              foreach (explode("\r\n", $header) as $hdr) {
+                  if (!empty($hdr) && !str_contains(strtolower($hdr), 'transfer-encoding')) {
+                      header($hdr);
+                  }
+              }
+              echo $body;
+              PHP_EOF
 
               echo "Standalone Next.js server and PHP proxy deployed successfully!"
             fi
