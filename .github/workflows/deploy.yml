@@ -25,12 +25,21 @@ jobs:
           port: ${{ secrets.PORT || 22 }}
           command_timeout: 60m
           script: |
-            # --- Load NVM & Shell Profile ---
+            # --- Auto-discover Node, NPM, and Docker paths ---
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            [ -s "$HOME/.bash_profile" ] && \. "$HOME/.bash_profile"
             [ -s "$HOME/.profile" ] && \. "$HOME/.profile"
             [ -s "$HOME/.bashrc" ] && \. "$HOME/.bashrc"
-            export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -n 1)/bin:/opt/alt/node20/bin:/opt/alt/node18/bin:/opt/alt/node16/bin
+            
+            for p in $HOME/.nvm/versions/node/v*/bin /opt/alt/node*/bin /usr/local/bin /usr/bin /opt/cpanel/ea-nodejs*/bin; do
+              [ -d "$p" ] && export PATH="$p:$PATH"
+            done
+            
+            NODE_PATH=$(dirname $(find /home /usr /opt -name npm 2>/dev/null | head -n 1))
+            if [ -n "$NODE_PATH" ]; then
+              export PATH="$NODE_PATH:$PATH"
+            fi
             
             # Set target directory
             TARGET_DIR="~/Mathisi"
