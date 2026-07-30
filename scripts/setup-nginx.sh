@@ -76,4 +76,10 @@ EOF' 2>&1 || true
   echo "$SUDO_PASS" | sudo -S systemctl restart nginx 2>&1 || echo "$SUDO_PASS" | sudo -S service nginx restart 2>&1 || echo "$SUDO_PASS" | sudo -S nginx -s reload 2>&1 || true
 fi
 
+echo "Testing http://127.0.0.1:9002 response:"
+curl -s -I http://127.0.0.1:9002 | head -n 5 || echo "Next.js on 9002 not responding!"
+
+echo "Testing http://localhost (port 80) response:"
+curl -s -I http://localhost | head -n 5 || echo "Port 80 local test finished"
+
 echo "Domain routing setup completed!"

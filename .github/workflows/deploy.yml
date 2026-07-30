@@ -23,6 +23,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           password: ${{ secrets.PASSWORD }}
           port: ${{ secrets.PORT || 22 }}
+          request_pty: true
           command_timeout: 60m
           script: |
             # --- Auto-discover Node, NPM, and Docker paths ---
