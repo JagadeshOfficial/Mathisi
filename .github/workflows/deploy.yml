@@ -13,38 +13,43 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Fetch full history to avoid shallow fetch issues
+          fetch-depth: 0
 
-      - name: Deploy to VPS via SSH
+      - name: Deploy to GoDaddy Server via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HOST }}
-          username: mathisi.in
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.PORT }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT || 22 }}
           command_timeout: 60m
           script: |
-            cd /home/mathisi.in/Quantum-Leap-Academy
+            # Set target directory
+            TARGET_DIR="~/Mathisi"
+            mkdir -p $TARGET_DIR
             
-            # --- Cleanup Orphan Processes & Locks ---
-            echo "Cleaning up orphan processes and locks..."
-            pkill -9 git || true
-            pkill -9 docker-compose || true
-            rm -f .git/index.lock
+            # --- Cleanup Locks ---
+            echo "Cleaning up locks..."
+            rm -f $TARGET_DIR/.git/index.lock
             
-            # --- Sync with Repo ---
-            echo "Syncing with repository..."
+            # --- Clone / Sync Repo ---
+            if [ ! -d "$TARGET_DIR/.git" ]; then
+              echo "Cloning repository..."
+              git clone https://github.com/JagadeshOfficial/Mathisi.git $TARGET_DIR
+            fi
+            
+            cd $TARGET_DIR
+            echo "Syncing with GitHub..."
             git fetch origin main
             git reset --hard origin/main
             git clean -fd
             
-            # --- Docker Deploy ---
-            echo "Deploying with Docker..."
+            # --- Docker Build & Deploy ---
+            echo "Deploying with Docker Compose..."
             docker compose down --remove-orphans || true
             docker compose up -d --build
             
-            # --- Post-Deploy Cleanup ---
-            echo "Cleaning up..."
+            # --- Cleanup ---
+            echo "Pruning unused images..."
             docker image prune -f
-            docker container prune -f || true
 

@@ -1,14 +1,14 @@
 version: '3.8'
 
 services:
-  quantum-leap-academy:
+  mathisi-app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: quantum-leap-academy
+    container_name: mathisi-app
     restart: always
     ports:
-      - "3005:3000"
+      - "3000:3000"
     environment:
       - NODE_ENV=production
       - HOSTNAME=0.0.0.0
