@@ -2,7 +2,7 @@
 
 SUDO_PASS="${SUDO_PASSWORD:-White@2026@@}"
 
-echo "Configuring domain web routing for mathisi.in..."
+echo "=== Domain Web Routing Setup ==="
 
 # 1. Target all public_html web root folders on GoDaddy
 for webroot in "$HOME/public_html" "/home/$USER/public_html" "/var/www/html" "/var/www/mathisi.in"; do
@@ -42,12 +42,12 @@ EOF
   fi
 done
 
-# 2. If Nginx system service is active, update Nginx sites configuration directly
+# 2. Overwrite Nginx default site & sites-available directly
 if command -v nginx >/dev/null 2>&1; then
-  echo "Updating Nginx service configuration..."
-  echo "$SUDO_PASS" | sudo -S rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+  echo "Updating Ubuntu Nginx default configuration..."
   
-  echo "$SUDO_PASS" | sudo -S tee /etc/nginx/sites-available/mathisi.in /etc/nginx/conf.d/mathisi.conf > /dev/null << 'EOF' || true
+  # Overwrite default site configuration with reverse proxy to Next.js on port 9002
+  echo "$SUDO_PASS" | sudo -S bash -c 'cat << "EOF" > /etc/nginx/sites-available/default
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -62,10 +62,18 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 }
-EOF
+EOF' 2>&1 || true
 
+  echo "$SUDO_PASS" | sudo -S cp -f /etc/nginx/sites-available/default /etc/nginx/sites-available/mathisi.in 2>/dev/null || true
+  echo "$SUDO_PASS" | sudo -S cp -f /etc/nginx/sites-available/default /etc/nginx/conf.d/mathisi.conf 2>/dev/null || true
+  
+  # Enable sites
+  echo "$SUDO_PASS" | sudo -S ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default 2>/dev/null || true
   echo "$SUDO_PASS" | sudo -S ln -sf /etc/nginx/sites-available/mathisi.in /etc/nginx/sites-enabled/mathisi.in 2>/dev/null || true
-  echo "$SUDO_PASS" | sudo -S nginx -t && (echo "$SUDO_PASS" | sudo -S systemctl reload nginx 2>/dev/null || echo "$SUDO_PASS" | sudo -S service nginx reload 2>/dev/null || echo "$SUDO_PASS" | sudo -S nginx -s reload 2>/dev/null) || true
+
+  # Test & Restart Nginx
+  echo "$SUDO_PASS" | sudo -S nginx -t 2>&1 || true
+  echo "$SUDO_PASS" | sudo -S systemctl restart nginx 2>&1 || echo "$SUDO_PASS" | sudo -S service nginx restart 2>&1 || echo "$SUDO_PASS" | sudo -S nginx -s reload 2>&1 || true
 fi
 
-echo "Domain routing configuration completed!"
+echo "Domain routing setup completed!"
