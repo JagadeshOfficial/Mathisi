@@ -90,32 +90,19 @@ jobs:
               echo "Running Docker containers:"
               docker ps
             else
-              echo "Deploying with Node & PM2..."
+              echo "Deploying Next.js build assets to GoDaddy public_html..."
               npm install
               npm run build
               
-              # Prepare standalone distribution assets
-              cp -r public .next/standalone/ 2>/dev/null || true
-              cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
-
-              # Copy distribution assets to Nginx / GoDaddy public webroots (fixes 404)
-              for target in "$HOME/public_html" "/var/www/html" "/home/$USER/public_html"; do
+              # Copy static HTML/CSS/JS export directly into GoDaddy public_html webroots
+              for target in "$HOME/public_html" "/home/$USER/public_html" "/var/www/html"; do
                 if [ -d "$target" ] || mkdir -p "$target" 2>/dev/null; then
-                  echo "Syncing assets to webroot: $target"
+                  echo "Syncing production web assets to: $target"
+                  cp -r out/* "$target/" 2>/dev/null || true
                   cp -r public/* "$target/" 2>/dev/null || true
-                  cp -r .next/standalone/* "$target/" 2>/dev/null || true
                 fi
               done
 
-              # Reset old PM2 processes
-              npx pm2 delete all 2>/dev/null || true
-
-              # Launch standalone Next.js server on port 9002 and 3000
-              PORT=9002 HOSTNAME=0.0.0.0 npx pm2 start .next/standalone/server.js --name "mathisi"
-              PORT=3000 HOSTNAME=0.0.0.0 npx pm2 start .next/standalone/server.js --name "mathisi-3000"
-              npx pm2 save
-
-              # Nginx Reverse Proxy Configuration
-              SUDO_PASSWORD="${{ secrets.PASSWORD }}" bash scripts/setup-nginx.sh || true
+              echo "Web assets deployed to public_html successfully!"
             fi
 
