@@ -25,6 +25,8 @@ jobs:
           port: ${{ secrets.PORT || 22 }}
           command_timeout: 60m
           script: |
+            export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
+            
             # Set target directory
             TARGET_DIR="~/Mathisi"
             mkdir -p $TARGET_DIR
@@ -45,12 +47,18 @@ jobs:
             git reset --hard origin/main
             git clean -fd
             
-            # --- Docker Build & Deploy ---
-            echo "Deploying with Docker Compose..."
-            docker compose down --remove-orphans || true
-            docker compose up -d --build
-            
-            # --- Cleanup ---
-            echo "Pruning unused images..."
-            docker image prune -f
+            # --- Build & Deploy ---
+            if command -v docker >/dev/null 2>&1; then
+              echo "Deploying with Docker Compose..."
+              docker compose down --remove-orphans || true
+              docker compose up -d --build
+              echo "Pruning unused images..."
+              docker image prune -f
+            else
+              echo "Docker not found in PATH on server. Deploying with Node & PM2..."
+              npm install
+              npm run build
+              npx pm2 restart mathisi || npx pm2 start npm --name "mathisi" -- run start -- -p 9002
+              npx pm2 save
+            fi
 
