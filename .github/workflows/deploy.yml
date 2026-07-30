@@ -83,7 +83,7 @@ jobs:
 
             # Write cPanel / PHP reverse proxy to ~/public_html
             mkdir -p "$HOME/public_html" 2>/dev/null || true
-            printf 'DirectoryIndex index.php\nRewriteEngine On\nRewriteCond %%{REQUEST_FILENAME} !-f\nRewriteCond %%{REQUEST_FILENAME} !-d\nRewriteRule ^(.*)$ index.php [QSA,L]\n' > "$HOME/public_html/.htaccess"
+            printf 'DirectoryIndex index.php\nRewriteEngine On\nRewriteCond %%{REQUEST_URI} ^/cgi-sys/\nRewriteRule ^(.*)$ /index.php [R=301,L]\nRewriteCond %%{REQUEST_FILENAME} !-f\nRewriteCond %%{REQUEST_FILENAME} !-d\nRewriteRule ^(.*)$ index.php [QSA,L]\n' > "$HOME/public_html/.htaccess"
             printf '<?php\n$uri = isset($_SERVER["REQUEST_URI"]) ? $_SERVER["REQUEST_URI"] : "/";\n$target = "http://127.0.0.1:9002" . $uri;\n$ch = curl_init();\ncurl_setopt($ch, CURLOPT_URL, $target);\ncurl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\ncurl_setopt($ch, CURLOPT_HEADER, true);\ncurl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);\ncurl_setopt($ch, CURLOPT_TIMEOUT, 30);\n$response = curl_exec($ch);\nif ($response === false) {\n    echo "Proxy Error: " . curl_error($ch);\n    curl_close($ch);\n    exit;\n}\n$header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);\n$header = substr($response, 0, $header_size);\n$body = substr($response, $header_size);\n$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);\ncurl_close($ch);\nhttp_response_code($http_code);\nforeach (explode("\\r\\n", $header) as $hdr) {\n    if (!empty($hdr) && !str_contains(strtolower($hdr), "transfer-encoding") && !str_contains(strtolower($hdr), "content-length")) {\n        header($hdr);\n    }\n}\necho $body;\n' > "$HOME/public_html/index.php"
 
             echo "Standalone Next.js server and PHP proxy deployed successfully!"
