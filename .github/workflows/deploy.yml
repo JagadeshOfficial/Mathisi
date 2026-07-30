@@ -79,6 +79,7 @@ jobs:
               npm install
               npm run build
               npx pm2 restart mathisi || npx pm2 start npm --name "mathisi" -- run start -- -p 9002
+              npx pm2 restart mathisi-3000 || npx pm2 start npm --name "mathisi-3000" -- run start -- -p 3000 || true
               npx pm2 save
 
               # Nginx Reverse Proxy Configuration
