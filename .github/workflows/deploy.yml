@@ -68,13 +68,27 @@ jobs:
             git reset --hard origin/main
             git clean -fd
             
-            # --- Build & Deploy ---
+            # --- Auto-install Docker & Docker Compose if missing ---
+            if ! command -v docker >/dev/null 2>&1; then
+              echo "Docker not found on server. Installing Docker automatically..."
+              SUDO_PASS="${{ secrets.PASSWORD }}"
+              echo "$SUDO_PASS" | sudo -S yum install -y docker docker-compose 2>/dev/null || \
+              (echo "$SUDO_PASS" | sudo -S apt-get update && echo "$SUDO_PASS" | sudo -S apt-get install -y docker.io docker-compose 2>/dev/null) || \
+              (curl -fsSL https://get.docker.com | echo "$SUDO_PASS" | sudo -S sh) || true
+              
+              echo "$SUDO_PASS" | sudo -S systemctl enable --now docker || true
+              echo "$SUDO_PASS" | sudo -S usermod -aG docker $USER || true
+            fi
+
+            # --- Docker Build & Deploy ---
             if command -v docker >/dev/null 2>&1; then
-              echo "Deploying with Docker Compose..."
+              echo "Deploying container with Docker Compose..."
               docker compose down --remove-orphans || true
               docker compose up -d --build
               echo "Pruning unused images..."
               docker image prune -f
+              echo "Running Docker containers:"
+              docker ps
             else
               echo "Deploying with Node & PM2..."
               npm install

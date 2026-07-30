@@ -5,7 +5,7 @@ SUDO_PASS="${SUDO_PASSWORD:-White@2026@@}"
 echo "=== Domain Web Routing Setup ==="
 
 # 1. Target all public_html web root folders on GoDaddy
-for webroot in "$HOME/public_html" "/home/$USER/public_html" "/var/www/html" "/var/www/mathisi.in"; do
+for webroot in "$HOME/public_html" "/home/$USER/public_html" "/var/www/html" "/var/www/mathisi.in" "/var/www/mathisi"; do
   if [ -d "$webroot" ] || mkdir -p "$webroot" 2>/dev/null; then
     echo "Writing reverse proxy rules to webroot: $webroot"
     
@@ -42,12 +42,13 @@ EOF
   fi
 done
 
-# 2. Overwrite Nginx default site & sites-available directly
+# 2. Complete Nginx wipe & replacement
 if command -v nginx >/dev/null 2>&1; then
-  echo "Updating Ubuntu Nginx default configuration..."
+  echo "Wiping old Nginx sites-enabled symlinks..."
+  echo "$SUDO_PASS" | sudo -S rm -f /etc/nginx/sites-enabled/* 2>/dev/null || true
   
-  # Overwrite default site configuration with reverse proxy to Next.js on port 9002
-  echo "$SUDO_PASS" | sudo -S bash -c 'cat << "EOF" > /etc/nginx/sites-available/default
+  echo "Creating new reverse proxy configuration for mathisi.in..."
+  echo "$SUDO_PASS" | sudo -S bash -c 'cat << "EOF" > /etc/nginx/sites-available/mathisi.in
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -64,12 +65,12 @@ server {
 }
 EOF' 2>&1 || true
 
-  echo "$SUDO_PASS" | sudo -S cp -f /etc/nginx/sites-available/default /etc/nginx/sites-available/mathisi.in 2>/dev/null || true
-  echo "$SUDO_PASS" | sudo -S cp -f /etc/nginx/sites-available/default /etc/nginx/conf.d/mathisi.conf 2>/dev/null || true
+  echo "$SUDO_PASS" | sudo -S cp -f /etc/nginx/sites-available/mathisi.in /etc/nginx/sites-available/default 2>/dev/null || true
+  echo "$SUDO_PASS" | sudo -S cp -f /etc/nginx/sites-available/mathisi.in /etc/nginx/conf.d/mathisi.conf 2>/dev/null || true
   
-  # Enable sites
-  echo "$SUDO_PASS" | sudo -S ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default 2>/dev/null || true
+  # Link active site
   echo "$SUDO_PASS" | sudo -S ln -sf /etc/nginx/sites-available/mathisi.in /etc/nginx/sites-enabled/mathisi.in 2>/dev/null || true
+  echo "$SUDO_PASS" | sudo -S ln -sf /etc/nginx/sites-available/mathisi.in /etc/nginx/sites-enabled/default 2>/dev/null || true
 
   # Test & Restart Nginx
   echo "$SUDO_PASS" | sudo -S nginx -t 2>&1 || true
