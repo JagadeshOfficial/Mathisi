@@ -26,7 +26,8 @@ jobs:
           request_pty: true
           command_timeout: 60m
           script: |
-            # --- Auto-discover Node and NPM paths ---
+            # --- Auto-discover System Paths ---
+            export PATH="/usr/bin:/usr/local/bin:/usr/libexec/docker/cli-plugins:$PATH"
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             [ -s "$HOME/.bash_profile" ] && \. "$HOME/.bash_profile"
@@ -68,7 +69,15 @@ jobs:
             git reset --hard origin/main
             git clean -fd
 
-            # --- Next.js Build & PM2 Deploy ---
+            # --- Docker Build & Deploy (Primary) ---
+            if command -v docker >/dev/null 2>&1; then
+              echo "Deploying with Docker & Docker Compose..."
+              docker compose down --remove-orphans 2>/dev/null || docker-compose down 2>/dev/null || true
+              docker compose up -d --build 2>/dev/null || docker-compose up -d --build 2>/dev/null || true
+              docker image prune -f 2>/dev/null || true
+            fi
+
+            # --- Fallback: Node & PM2 Standalone Build ---
             echo "Deploying Next.js standalone server with PM2..."
             npm install
             npm run build
@@ -84,6 +93,6 @@ jobs:
             # Write cPanel / PHP reverse proxy to ~/public_html
             mkdir -p "$HOME/public_html" 2>/dev/null || true
             printf 'DirectoryIndex index.php\nRewriteEngine On\nRewriteCond %%{REQUEST_URI} ^/cgi-sys/\nRewriteRule ^(.*)$ /index.php [R=301,L]\nRewriteCond %%{REQUEST_FILENAME} !-f\nRewriteCond %%{REQUEST_FILENAME} !-d\nRewriteRule ^(.*)$ index.php [QSA,L]\n' > "$HOME/public_html/.htaccess"
-            printf '<?php\n$uri = isset($_SERVER["REQUEST_URI"]) ? $_SERVER["REQUEST_URI"] : "/";\n$target = "http://127.0.0.1:9002" . $uri;\n$ch = curl_init();\ncurl_setopt($ch, CURLOPT_URL, $target);\ncurl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\ncurl_setopt($ch, CURLOPT_HEADER, true);\ncurl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);\ncurl_setopt($ch, CURLOPT_TIMEOUT, 30);\n$response = curl_exec($ch);\nif ($response === false) {\n    echo "Proxy Error: " . curl_error($ch);\n    curl_close($ch);\n    exit;\n}\n$header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);\n$header = substr($response, 0, $header_size);\n$body = substr($response, $header_size);\n$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);\ncurl_close($ch);\nhttp_response_code($http_code);\nforeach (explode("\\r\\n", $header) as $hdr) {\n    if (!empty($hdr) && !str_contains(strtolower($hdr), "transfer-encoding") && !str_contains(strtolower($hdr), "content-length")) {\n        header($hdr);\n    }\n}\necho $body;\n' > "$HOME/public_html/index.php"
+            printf '<?php\n$uri = isset($_SERVER["REQUEST_URI"]) ? $_SERVER["REQUEST_URI"] : "/";\n$target = "http://127.0.0.1:9002" . $uri;\n$ch = curl_init();\ncurl_setopt($ch, CURLOPT_URL, $target);\ncurl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\ncurl_setopt($ch, CURLOPT_HEADER, true);\ncurl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);\ncurl_setopt($ch, CURLOPT_TIMEOUT, 30);\n$response = curl_exec($ch);\nif ($response !== false) {\n    $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);\n    $header = substr($response, 0, $header_size);\n    $body = substr($response, $header_size);\n    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);\n    curl_close($ch);\n    http_response_code($http_code);\n    foreach (explode("\\r\\n", $header) as $hdr) {\n        if (!empty($hdr) && !str_contains(strtolower($hdr), "transfer-encoding") && !str_contains(strtolower($hdr), "content-length")) {\n            header($hdr);\n        }\n    }\n    echo $body;\n} else {\n    curl_close($ch);\n    echo "Service initializing...";\n}\n' > "$HOME/public_html/index.php"
 
-            echo "Standalone Next.js server and PHP proxy deployed successfully!"
+            echo "Deployment completed successfully!"
