@@ -1,15 +1,55 @@
 version: '3.8'
 
 services:
-  mathisi-app:
+  mathisi-frontend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mathisi-app
+    image: jagadeshvana/mathisi-frontend:latest
+    container_name: mathisi-frontend
     restart: always
     ports:
-      - "80:3000"
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - NODE_ENV=production
+      - PORT=3000
       - HOSTNAME=0.0.0.0
+      - DB_HOST=mathisi-mysql
+      - DB_USER=root
+      - DB_PASSWORD=${MYSQL_PASSWORD:-Mathisi@2026}
+      - DB_NAME=mathisi
+      - EMAIL_USER=${EMAIL_USER:-akshjavahub@gmail.com}
+      - EMAIL_PASS=${EMAIL_PASS:-}
+    depends_on:
+      mathisi-mysql:
+        condition: service_healthy
+    networks:
+      - mathisi-network
+
+  mathisi-mysql:
+    image: mysql:8.0
+    container_name: mathisi-mysql
+    restart: always
+    ports:
+      - "3308:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_PASSWORD:-Mathisi@2026}
+      - MYSQL_DATABASE=mathisi
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./Db.sql:/docker-entrypoint-initdb.d/Db.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_PASSWORD:-Mathisi@2026}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mathisi-network
+
+volumes:
+  mysql_data:
+
+networks:
+  mathisi-network:
+    driver: bridge
+

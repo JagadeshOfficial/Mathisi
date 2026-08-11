@@ -38,19 +38,9 @@ jobs:
             if [ -n "$NPM_BIN" ]; then
               export PATH="$(dirname "$NPM_BIN"):$PATH"
             fi
-            
-            # --- Auto-install Node.js & NVM if missing ---
-            if ! command -v npm >/dev/null 2>&1; then
-              echo "NPM not found. Installing Node.js & NVM automatically..."
-              curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-              export NVM_DIR="$HOME/.nvm"
-              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-              nvm install 20
-              nvm use 20
-            fi
-            
+
             # Set target directory
-            TARGET_DIR="~/Mathisi"
+            TARGET_DIR="$HOME/mathisi.in"
             mkdir -p $TARGET_DIR
             
             # --- Cleanup Locks ---
@@ -69,30 +59,26 @@ jobs:
             git reset --hard origin/main
             git clean -fd
 
-            # --- Docker Build & Deploy (Primary) ---
+            # --- Docker Build & Deploy ---
             if command -v docker >/dev/null 2>&1; then
-              echo "Deploying with Docker & Docker Compose..."
+              echo "Deploying Mathisi with Docker & Docker Compose..."
               docker compose down --remove-orphans 2>/dev/null || docker-compose down 2>/dev/null || true
               docker compose up -d --build 2>/dev/null || docker-compose up -d --build 2>/dev/null || true
               docker image prune -f 2>/dev/null || true
+            else
+              echo "Docker not available. Deploying Next.js standalone server with PM2..."
+              npm install
+              npm run build
+              cp -r public .next/standalone/ 2>/dev/null || true
+              cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
+              PORT=3001 HOSTNAME=0.0.0.0 npx pm2 restart mathisi || PORT=3001 HOSTNAME=0.0.0.0 npx pm2 start .next/standalone/server.js --name "mathisi"
+              npx pm2 save
             fi
 
-            # --- Fallback: Node & PM2 Standalone Build ---
-            echo "Deploying Next.js standalone server with PM2..."
-            npm install
-            npm run build
-            
-            # Prepare standalone distribution assets
-            cp -r public .next/standalone/ 2>/dev/null || true
-            cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
-
-            # Launch standalone Next.js server via PM2 on port 9002
-            PORT=9002 HOSTNAME=0.0.0.0 npx pm2 restart mathisi || PORT=9002 HOSTNAME=0.0.0.0 npx pm2 start .next/standalone/server.js --name "mathisi"
-            npx pm2 save
-
-            # Write cPanel / PHP reverse proxy to ~/public_html
+            # Update cPanel / PHP reverse proxy in public_html pointing to 3001
             mkdir -p "$HOME/public_html" 2>/dev/null || true
             printf 'DirectoryIndex index.php\nRewriteEngine On\nRewriteCond %%{REQUEST_URI} ^/cgi-sys/\nRewriteRule ^(.*)$ /index.php [R=301,L]\nRewriteCond %%{REQUEST_FILENAME} !-f\nRewriteCond %%{REQUEST_FILENAME} !-d\nRewriteRule ^(.*)$ index.php [QSA,L]\n' > "$HOME/public_html/.htaccess"
-            printf '<?php\n$uri = isset($_SERVER["REQUEST_URI"]) ? $_SERVER["REQUEST_URI"] : "/";\n$target = "http://127.0.0.1:9002" . $uri;\n$ch = curl_init();\ncurl_setopt($ch, CURLOPT_URL, $target);\ncurl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\ncurl_setopt($ch, CURLOPT_HEADER, true);\ncurl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);\ncurl_setopt($ch, CURLOPT_TIMEOUT, 30);\n$response = curl_exec($ch);\nif ($response !== false) {\n    $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);\n    $header = substr($response, 0, $header_size);\n    $body = substr($response, $header_size);\n    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);\n    curl_close($ch);\n    http_response_code($http_code);\n    foreach (explode("\\r\\n", $header) as $hdr) {\n        if (!empty($hdr) && !str_contains(strtolower($hdr), "transfer-encoding") && !str_contains(strtolower($hdr), "content-length")) {\n            header($hdr);\n        }\n    }\n    echo $body;\n} else {\n    curl_close($ch);\n    echo "Service initializing...";\n}\n' > "$HOME/public_html/index.php"
+            printf '<?php\n$uri = isset($_SERVER["REQUEST_URI"]) ? $_SERVER["REQUEST_URI"] : "/";\n$target = "http://127.0.0.1:3001" . $uri;\n$ch = curl_init();\ncurl_setopt($ch, CURLOPT_URL, $target);\ncurl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\ncurl_setopt($ch, CURLOPT_HEADER, true);\ncurl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);\ncurl_setopt($ch, CURLOPT_TIMEOUT, 30);\n$response = curl_exec($ch);\nif ($response !== false) {\n    $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);\n    $header = substr($response, 0, $header_size);\n    $body = substr($response, $header_size);\n    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);\n    curl_close($ch);\n    http_response_code($http_code);\n    foreach (explode("\\r\\n", $header) as $hdr) {\n        if (!empty($hdr) && !str_contains(strtolower($hdr), "transfer-encoding") && !str_contains(strtolower($hdr), "content-length")) {\n            header($hdr);\n        }\n    }\n    echo $body;\n} else {\n    curl_close($ch);\n    echo "Service initializing...";\n}\n' > "$HOME/public_html/index.php"
 
             echo "Deployment completed successfully!"
+
