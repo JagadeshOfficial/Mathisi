@@ -1,4 +1,4 @@
-name: Build Docker Image and Deploy Mathisi
+name: Deploy Mathisi with Docker
 
 on:
   push:
@@ -6,33 +6,12 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub (Optional)
-        if: secrets.DOCKER_HUB_USERNAME != '' && secrets.DOCKER_HUB_ACCESS_TOKEN != ''
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-      - name: Build and Push Docker Image to Docker Hub
-        if: secrets.DOCKER_HUB_USERNAME != '' && secrets.DOCKER_HUB_ACCESS_TOKEN != ''
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/mathisi-frontend:latest
-            ${{ secrets.DOCKER_HUB_USERNAME }}/mathisi-frontend:${{ github.sha }}
 
       - name: Deploy to GoDaddy VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -69,5 +48,6 @@ jobs:
             fi
 
             echo "Mathisi Docker Deployment Completed Successfully!"
+
 
 
