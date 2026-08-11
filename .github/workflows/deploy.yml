@@ -1,4 +1,4 @@
-name: Deploy Next.js with Docker
+name: Build Docker Image and Deploy Mathisi
 
 on:
   push:
@@ -6,16 +6,35 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Deploy to GoDaddy Server via SSH
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub (Optional)
+        if: ${{ secrets.DOCKER_HUB_USERNAME != '' && secrets.DOCKER_HUB_ACCESS_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build and Push Docker Image to Docker Hub
+        if: ${{ secrets.DOCKER_HUB_USERNAME != '' && secrets.DOCKER_HUB_ACCESS_TOKEN != '' }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/mathisi-frontend:latest
+            ${{ secrets.DOCKER_HUB_USERNAME }}/mathisi-frontend:${{ github.sha }}
+
+      - name: Deploy to GoDaddy VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HOST }}
@@ -26,59 +45,29 @@ jobs:
           request_pty: true
           command_timeout: 60m
           script: |
-            # --- Auto-discover System Paths ---
             export PATH="/usr/bin:/usr/local/bin:/usr/libexec/docker/cli-plugins:$PATH"
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            [ -s "$HOME/.bash_profile" ] && \. "$HOME/.bash_profile"
-            [ -s "$HOME/.profile" ] && \. "$HOME/.profile"
-            [ -s "$HOME/.bashrc" ] && \. "$HOME/.bashrc"
             
-            NPM_BIN=$(find /home /usr /opt /var -name npm 2>/dev/null | head -n 1)
-            if [ -n "$NPM_BIN" ]; then
-              export PATH="$(dirname "$NPM_BIN"):$PATH"
-            fi
-
-            # Set target directory
             TARGET_DIR="$HOME/mathisi.in"
             mkdir -p $TARGET_DIR
-            
-            # --- Cleanup Locks ---
-            echo "Cleaning up locks..."
-            rm -f $TARGET_DIR/.git/index.lock
-            
-            # --- Clone / Sync Repo ---
+
+            # Clone or Sync repository
             if [ ! -d "$TARGET_DIR/.git" ]; then
-              echo "Cloning repository..."
               git clone https://github.com/JagadeshOfficial/Mathisi.git $TARGET_DIR
             fi
-            
+
             cd $TARGET_DIR
-            echo "Syncing with GitHub..."
             git fetch origin main
             git reset --hard origin/main
             git clean -fd
 
-            # --- Docker Build & Deploy ---
+            # Deploy with Docker & Docker Compose (matching Intelskill architecture)
             if command -v docker >/dev/null 2>&1; then
-              echo "Deploying Mathisi with Docker & Docker Compose..."
+              echo "Deploying Docker containers for mathisi.in..."
               docker compose down --remove-orphans 2>/dev/null || docker-compose down 2>/dev/null || true
               docker compose up -d --build 2>/dev/null || docker-compose up -d --build 2>/dev/null || true
               docker image prune -f 2>/dev/null || true
-            else
-              echo "Docker not available. Deploying Next.js standalone server with PM2..."
-              npm install
-              npm run build
-              cp -r public .next/standalone/ 2>/dev/null || true
-              cp -r .next/static .next/standalone/.next/ 2>/dev/null || true
-              PORT=3001 HOSTNAME=0.0.0.0 npx pm2 restart mathisi || PORT=3001 HOSTNAME=0.0.0.0 npx pm2 start .next/standalone/server.js --name "mathisi"
-              npx pm2 save
             fi
 
-            # Update cPanel / PHP reverse proxy in public_html pointing to 3001
-            mkdir -p "$HOME/public_html" 2>/dev/null || true
-            printf 'DirectoryIndex index.php\nRewriteEngine On\nRewriteCond %%{REQUEST_URI} ^/cgi-sys/\nRewriteRule ^(.*)$ /index.php [R=301,L]\nRewriteCond %%{REQUEST_FILENAME} !-f\nRewriteCond %%{REQUEST_FILENAME} !-d\nRewriteRule ^(.*)$ index.php [QSA,L]\n' > "$HOME/public_html/.htaccess"
-            printf '<?php\n$uri = isset($_SERVER["REQUEST_URI"]) ? $_SERVER["REQUEST_URI"] : "/";\n$target = "http://127.0.0.1:3001" . $uri;\n$ch = curl_init();\ncurl_setopt($ch, CURLOPT_URL, $target);\ncurl_setopt($ch, CURLOPT_RETURNTRANSFER, true);\ncurl_setopt($ch, CURLOPT_HEADER, true);\ncurl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);\ncurl_setopt($ch, CURLOPT_TIMEOUT, 30);\n$response = curl_exec($ch);\nif ($response !== false) {\n    $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);\n    $header = substr($response, 0, $header_size);\n    $body = substr($response, $header_size);\n    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);\n    curl_close($ch);\n    http_response_code($http_code);\n    foreach (explode("\\r\\n", $header) as $hdr) {\n        if (!empty($hdr) && !str_contains(strtolower($hdr), "transfer-encoding") && !str_contains(strtolower($hdr), "content-length")) {\n            header($hdr);\n        }\n    }\n    echo $body;\n} else {\n    curl_close($ch);\n    echo "Service initializing...";\n}\n' > "$HOME/public_html/index.php"
+            echo "Mathisi Docker Deployment Completed Successfully!"
 
-            echo "Deployment completed successfully!"
 
